@@ -24,6 +24,7 @@ internal struct MKRenderer {
                 blockView(for: blocks[index])
             }
         }
+		.background(Color.red.opacity(0.3))
     }
 
     @ViewBuilder
@@ -39,7 +40,7 @@ internal struct MKRenderer {
         case .listItem(let content, let level):
             AnyView(listItemView(content: content, level: level))
             
-        case .list(let items, _):
+        case .list(_, _):
             // Implementación futura para listas anidadas
             AnyView(EmptyView())
             

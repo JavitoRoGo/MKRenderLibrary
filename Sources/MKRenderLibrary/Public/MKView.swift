@@ -26,7 +26,10 @@ public struct MKView: View {
 		let blocks = parser.parse(content)
 		
 		// 3. Usamos el Renderer para dibujar (Paso 6)
-		MKRenderer(theme: _theme)
+		return MKRenderer(theme: _theme)
 			.render(blocks)
+			.onAppear {
+				print("DEBUG: Número de bloques encontrados: \(blocks.count)")
+			}
 	}
 }
