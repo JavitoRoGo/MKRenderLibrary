@@ -2,7 +2,7 @@ import Foundation
 import Markdown
 
 /// El motor de la librería. Convierte un String Markdown en nuestro modelo interno de bloques.
-internal struct MKParser: MarkupVisitor<Void> {
+internal struct MKParser: MarkupVisitor {
 	
 	// Propiedad para acumular los bloques. Al ser una 'struct', usamos mutating para cambiar esto.
 	private var accumulatedBlocks: [MKBlock] = []
@@ -10,79 +10,67 @@ internal struct MKParser: MarkupVisitor<Void> {
 	/// Punto de entrada principal.
 	mutating func parse(_ markdown: String) -> [MKBlock] {
 		let document = Document(parsing: markdown)
-		accumulatedBlocks = []
-		visit(document)
+		accumulatedBlocks = [] // Limpiamos para evitar duplicados en llamadas sucesivas
+		visit(document)        // Iniciamos el recorrido del árbol
 		return accumulatedBlocks
 	}
 
 	// MARK: - Visitor Methods
-
-	mutating func visitText(_ text: Text) -> Void {
-		// No hacemos nada con el texto plano directamente en el nivel de bloque.
-		return
+	
+	mutating func visitText(_ text: Text) {
+		// El texto plano no genera un bloque de nivel superior.
 	}
-
-	mutating func visitHeading(_ heading: Heading) -> Void {
+	
+	mutating func visitHeading(_ heading: Heading) {
 		let level = heading.level
 		let content = parseInlineText(heading)
 		accumulatedBlocks.append(.heading(level: level, content: content))
-		return
 	}
-
-	mutating func visitParagraph(_ paragraph: Paragraph) -> Void {
+	
+	mutating func visitParagraph(_ paragraph: Paragraph) {
 		let content = parseInlineText(paragraph)
 		accumulatedBlocks.append(.paragraph(content: content))
-		return
 	}
-
-	mutating func visitListItem(_ listItem: ListItem) -> Void {
+	
+	mutating func visitListItem(_ listItem: ListItem) {
 		// Para el MVP, extraemos el contenido del item.
 		let content = parseInlineText(listItem)
 		accumulatedBlocks.append(.listItem(content: content, level: 0))
-		return
 	}
-
-	mutating func visitCodeBlock(_ codeBlock: CodeBlock) -> Void {
+	
+	mutating func visitCodeBlock(_ codeBlock: CodeBlock) {
 		let code = codeBlock.code
-		// Acceso correcto al lenguaje (es un elemento Markup que puede ser Text)
 		var languageString: String? = nil
 		if let langMarkup = codeBlock.language {
-			// Convertimos el markup del lenguaje a string de forma segura
 			languageString = String(describing: langMarkup)
 		}
-		
 		accumulatedBlocks.append(.codeBlock(code: code, language: languageString))
-		return
 	}
-
-	mutating func visitBlockQuote(_ blockQuote: BlockQuote) -> Void {
-		// Para permitir que los elementos dentro del blockquote (como párrafos)
-		// sean visitados y añadidos a accumulatedBlocks, visitamos sus hijos.
-		for child in blockQuote.children {
+	
+	mutating func visitBlockQuote(_ blockQuote: BlockQuote) {
+		// En lugar de un bucle manual aquí, dejamos que defaultVisit 
+		// maneje la recursión de forma genérica.
+	}
+	
+	mutating func visitThematicBreak(_ thematicBreak: ThematicBreak) {
+		accumulatedBlocks.append(.thematicBreak)
+	}
+	
+	/// SOLUCIÓN AL PROBLEMA DE RECURSIÓN:
+	/// Esta función es la que permite que el recorrido no se detenga.
+	/// Si el nodo no es un Heading, Paragraph, etc., entra aquí y 
+	/// recorremos sus hijos manualmente para seguir bajando en el árbol.
+	mutating func defaultVisit(_ markup: Markup) {
+		for child in markup.children {
 			visit(child)
 		}
-		return
 	}
-
-	mutating func visitThematicBreak(_ thematicBreak: ThematicBreak) -> Void {
-		accumulatedBlocks.append(.thematicBreak)
-		return
-	}
-
-	mutating func defaultVisit(_ markup: Markup) -> Void {
-		// No hacemos nada por defecto
-		return
-	}
-
+	
 	// MARK: - Helpers (Paso 5: AttributedString)
 
 	private func parseInlineText(_ node: Markup) -> AttributedString {
-		// Usamos String(describing:) que es la forma estándar y segura de
-		// obtener la representación textual de un nodo Markup en swift-markdown.
 		let rawText = String(describing: node)
-		
 		do {
-			// Aprovechamos el parser de Foundation para los estilos inline
 			return try AttributedString(markdown: rawText)
 		} catch {
 			return AttributedString(rawText)
