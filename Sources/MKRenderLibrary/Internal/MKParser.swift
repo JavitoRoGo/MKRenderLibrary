@@ -10,8 +10,8 @@ internal struct MKParser: MarkupVisitor {
 	/// Punto de entrada principal.
 	mutating func parse(_ markdown: String) -> [MKBlock] {
 		let document = Document(parsing: markdown)
-		accumulatedBlocks = [] // Limpiamos para evitar duplicados en llamadas sucesivas
-		visit(document)        // Iniciamos el recorrido del árbol
+		accumulatedBlocks = []
+		visit(document)
 		return accumulatedBlocks
 	}
 
@@ -56,10 +56,6 @@ internal struct MKParser: MarkupVisitor {
 		accumulatedBlocks.append(.thematicBreak)
 	}
 	
-	/// SOLUCIÓN AL PROBLEMA DE RECURSIÓN:
-	/// Esta función es la que permite que el recorrido no se detenga.
-	/// Si el nodo no es un Heading, Paragraph, etc., entra aquí y 
-	/// recorremos sus hijos manualmente para seguir bajando en el árbol.
 	mutating func defaultVisit(_ markup: Markup) {
 		for child in markup.children {
 			visit(child)
@@ -69,7 +65,22 @@ internal struct MKParser: MarkupVisitor {
 	// MARK: - Helpers (Paso 5: AttributedString)
 
 	private func parseInlineText(_ node: Markup) -> AttributedString {
-		let rawText = String(describing: node)
+		// En lugar de String(describing:), recorremos los hijos para concatenar el texto real.
+		let rawText = node.children.map { child in
+			if let text = child as? Text {
+				return String(text.string)
+			} else if let inline = child as? InlineMarkup {
+				// Si es otro tipo de markup inline (como Bold o Italic), 
+                // lo convertimos a su representación string para que AttributedString lo procese.
+				return String(describing: inline)
+			}
+			return ""
+		}.joined()
+
+        // Si el método anterior falla al reconstruir la estructura compleja, 
+        // una alternativa robusta es usar el contenido de texto directamente si está disponible.
+        // Pero para mantener tu lógica de AttributedString con Markdown:
+        
 		do {
 			return try AttributedString(markdown: rawText)
 		} catch {

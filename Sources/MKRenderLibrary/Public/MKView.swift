@@ -28,8 +28,5 @@ public struct MKView: View {
 		// 3. Usamos el Renderer para dibujar (Paso 6)
 		return MKRenderer(theme: _theme)
 			.render(blocks)
-			.onAppear {
-				print("DEBUG: Número de bloques encontrados: \(blocks.count)")
-			}
 	}
 }

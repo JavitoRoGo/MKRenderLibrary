@@ -24,7 +24,6 @@ internal struct MKRenderer {
                 blockView(for: blocks[index])
             }
         }
-		.background(Color.red.opacity(0.3))
     }
 
     @ViewBuilder
