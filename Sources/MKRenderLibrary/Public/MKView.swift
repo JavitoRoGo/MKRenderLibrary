@@ -10,21 +10,23 @@ import SwiftUI
 
 /// La vista principal para renderizar contenido Markdown en SwiftUI.
 public struct MKView: View {
-    let content: String
-    
-    // Usamos un nombre con guion bajo para indicar que es interno/de uso de la estructura
-    internal var _theme: MKTheme = .default
+	let content: String
+	
+	internal var _theme: MKTheme = .default
 
-    public init(content: String) {
-        self.content = content
-    }
+	public init(content: String) {
+		self.content = content
+	}
 
-    public var body: some View {
-        // Por ahora, esto es un placeholder. 
-        // En el siguiente paso implementaremos el Parser y el Renderer real.
-        VStack(alignment: .leading, spacing: 10) {
-            Text(content)
-                .font(_theme.bodyFont)
-        }
-    }
+	public var body: some View {
+		// 1. Instanciamos el Parser (Internal)
+		var parser = MKParser()
+		
+		// 2. Obtenemos los bloques (Paso 4 completado)
+		let blocks = parser.parse(content)
+		
+		// 3. Usamos el Renderer para dibujar (Paso 6)
+		MKRenderer(theme: _theme)
+			.render(blocks)
+	}
 }
