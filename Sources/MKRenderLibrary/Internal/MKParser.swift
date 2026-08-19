@@ -37,15 +37,8 @@ internal struct MKParser: MarkupVisitor {
 		let content = parseInlineText(listItem)
 		accumulatedBlocks.append(.listItem(content: content, level: 0))
 	}
-	
-	mutating func visitCodeBlock(_ codeBlock: CodeBlock) {
-		let code = codeBlock.code
-		var languageString: String? = nil
-		if let langMarkup = codeBlock.language {
-			languageString = String(describing: langMarkup)
-		}
-		accumulatedBlocks.append(.codeBlock(code: code, language: languageString))
-	}
+
+    // Eliminamos la función visitCodeBlock que causaba error de compilación
 	
 	mutating func visitBlockQuote(_ blockQuote: BlockQuote) {
 		// En lugar de un bucle manual aquí, dejamos que defaultVisit 
@@ -57,34 +50,74 @@ internal struct MKParser: MarkupVisitor {
 	}
 	
 	mutating func defaultVisit(_ markup: Markup) {
-		for child in markup.children {
-			visit(child)
-		}
+		print("DEBUG: Visitando nodo de tipo: \(type(of: markup))")
+		
+        let mirror = Mirror(reflecting: markup)
+        if String(describing: mirror.subjectType).contains("CodeBlock") {
+            // Usamos reconstructMarkdown para obtener el contenido del bloque
+            let code = reconstructMarkdown(from: markup)
+            
+            var language: String? = nil
+            for child in mirror.children {
+                if let label = child.label, (label == "language" || label == "_language") {
+                    let langVal = "\(child.value)"
+                    if !langVal.contains("nil") && !langVal.isEmpty {
+                        language = langVal.replacingOccurrences(of: "Optional(", with: "").replacingOccurrences(of: ")", with: "")
+                    }
+                }
+            }
+            
+            // Si el código extraído es vacío, imprimimos para debug
+            if code.isEmpty { print("DEBUG: El bloque de código se extrajo como STRING VACÍO") }
+            
+            accumulatedBlocks.append(.codeBlock(code: code, language: language))
+        } else {
+            for child in markup.children {
+                visit(child)
+            }
+        }
 	}
 	
 	// MARK: - Helpers (Paso 5: AttributedString)
 
 	private func parseInlineText(_ node: Markup) -> AttributedString {
-		// En lugar de String(describing:), recorremos los hijos para concatenar el texto real.
-		let rawText = node.children.map { child in
-			if let text = child as? Text {
-				return String(text.string)
-			} else if let inline = child as? InlineMarkup {
-				// Si es otro tipo de markup inline (como Bold o Italic), 
-                // lo convertimos a su representación string para que AttributedString lo procese.
-				return String(describing: inline)
-			}
-			return ""
-		}.joined()
-
-        // Si el método anterior falla al reconstruir la estructura compleja, 
-        // una alternativa robusta es usar el contenido de texto directamente si está disponible.
-        // Pero para mantener tu lógica de AttributedString con Markdown:
-        
+		let rawMarkdown = reconstructMarkdown(from: node)
+		
 		do {
-			return try AttributedString(markdown: rawText)
+			return try AttributedString(markdown: rawMarkdown)
 		} catch {
-			return AttributedString(rawText)
+			return AttributedString(rawMarkdown)
 		}
 	}
+
+	private func reconstructMarkdown(from node: Markup) -> String {
+		var result = ""
+		
+		for child in node.children {
+			if let text = child as? Text {
+				result += text.string
+			} else if let strong = child as? Strong {
+				result += "**" + reconstructMarkdown(from: strong) + "**"
+			} else if let emphasis = child as? Emphasis {
+				result += "*" + reconstructMarkdown(from: emphasis) + "*"
+			} else if let link = child as? Link {
+				result += "[" + reconstructMarkdown(from: link) + "]"
+			} else if !Array(child.children).isEmpty {
+				// Si el nodo tiene hijos pero no es uno de los tipos anteriores, 
+				// seguimos bajando recursivamente hasta encontrar Text.
+				result += reconstructMarkdown(from: child)
+			} else {
+				// Si llegamos aquí es porque es un nodo hoja que no es 'Text'.
+				// Intentamos extraer su valor mediante reflexión de forma muy específica.
+				let mirror = Mirror(reflecting: child)
+				if let firstChild = mirror.children.first, let val = firstChild.value as? String {
+					result += val
+				}
+			}
+		}
+		
+		return result
+	}
 }
+
+// (Eliminado AnyCodeBlockProxy ya que no es necesario)
